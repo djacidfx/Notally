@@ -2,19 +2,50 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:clipChildren="false">
 
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/Toolbar"
+    <FrameLayout
+        android:id="@+id/ToolbarContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:navigationIcon="?attr/homeAsUpIndicator" />
+        android:clipChildren="false">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/Toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:navigationIcon="?attr/homeAsUpIndicator" />
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/Search"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:outlineProvider="none"
+            app:navigationIcon="?attr/homeAsUpIndicator">
+
+            <EditText
+                android:id="@+id/EnterSearchKeyword"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@null"
+                android:hint="@string/search"
+                android:imeOptions="actionSearch"
+                android:inputType="textFilter"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
+                android:textAppearance="?attr/textAppearanceBody1" />
+
+        </com.google.android.material.appbar.MaterialToolbar>
+
+    </FrameLayout>
+
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/ScrollView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/Toolbar"
+        android:layout_below="@id/ToolbarContainer"
         android:fillViewport="true"
         android:theme="@style/Colorless"
         android:visibility="gone">

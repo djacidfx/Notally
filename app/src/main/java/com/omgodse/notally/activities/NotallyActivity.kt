@@ -64,6 +64,13 @@ abstract class NotallyActivity(private val type: Type) : AppCompatActivity() {
     internal lateinit var binding: ActivityNotallyBinding
     internal val model: NotallyModel by viewModels()
 
+    override fun onBackPressed() {
+        if (model.actionMode.enabled.value) {
+            model.actionMode.close()
+        } else super.onBackPressed()
+    }
+
+
     override fun finish() {
         lifecycleScope.launch {
             model.saveNote()
@@ -543,6 +550,48 @@ abstract class NotallyActivity(private val type: Type) : AppCompatActivity() {
     }
 
 
+    private fun setupSearch() {
+        binding.Search.setNavigationOnClickListener { onBackPressed() }
+
+        val menu = binding.Search.menu
+        menu.add(R.string.previous, R.drawable.previous) {}
+        menu.add(R.string.next, R.drawable.next) {}
+
+        val manager = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+
+        val transition = MaterialFade()
+        transition.secondaryAnimatorProvider = null
+        transition.addListener(object : Transition.TransitionListener {
+
+            override fun onTransitionEnd(transition: Transition) {
+                if (binding.Search.visibility == View.VISIBLE) {
+                    binding.EnterSearchKeyword.requestFocus()
+                    manager.showSoftInput(binding.EnterSearchKeyword, InputMethodManager.SHOW_IMPLICIT)
+                } else {
+                    binding.EnterSearchKeyword.text.clear()
+                    manager.hideSoftInputFromWindow(binding.EnterSearchKeyword.windowToken, 0)
+                }
+            }
+
+            override fun onTransitionStart(transition: Transition) {}
+
+            override fun onTransitionCancel(transition: Transition) {}
+
+            override fun onTransitionPause(transition: Transition) {}
+
+            override fun onTransitionResume(transition: Transition) {}
+        })
+
+        model.actionMode.enabled.observe(this, Observer { enabled ->
+            TransitionManager.beginDelayedTransition(binding.ToolbarContainer, transition)
+            if (enabled) {
+                binding.Search.visibility = View.VISIBLE
+            } else {
+                binding.Search.visibility = View.GONE
+            }
+        })
+    }
+
     private fun setupToolbar() {
         binding.Toolbar.setNavigationOnClickListener { finish() }
 
@@ -555,6 +604,7 @@ abstract class NotallyActivity(private val type: Type) : AppCompatActivity() {
 
         menu.add(R.string.share, R.drawable.share) { share() }
         menu.add(R.string.labels, R.drawable.label) { label() }
+        menu.add(R.string.search, R.drawable.search) { model.actionMode.enabled.value = true }
         menu.add(R.string.add_images, R.drawable.add_images) { selectImages() }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -607,6 +657,7 @@ abstract class NotallyActivity(private val type: Type) : AppCompatActivity() {
         setupAudios()
         setupReminder()
         setupToolbar()
+        setupSearch()
 
         binding.root.isSaveFromParentEnabled = false
     }

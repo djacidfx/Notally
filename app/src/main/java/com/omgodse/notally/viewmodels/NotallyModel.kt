@@ -26,6 +26,7 @@ import com.omgodse.notally.Cache
 import com.omgodse.notally.Progress
 import com.omgodse.notally.R
 import com.omgodse.notally.ReminderReceiver
+import com.omgodse.notally.SearchActionMode
 import com.omgodse.notally.image.Event
 import com.omgodse.notally.image.ImageError
 import com.omgodse.notally.miscellaneous.IO
@@ -87,6 +88,8 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
 
     val reminder = MutableLiveData<Reminder>(null)
     private val manager = app.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+
+    val actionMode = SearchActionMode()
 
     fun addAudio() {
         viewModelScope.launch {
