@@ -23,10 +23,10 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.omgodse.notally.AttachmentDeleteService
 import com.omgodse.notally.Cache
+import com.omgodse.notally.MarkerSpan
 import com.omgodse.notally.Progress
 import com.omgodse.notally.R
 import com.omgodse.notally.ReminderReceiver
-import com.omgodse.notally.SearchActionMode
 import com.omgodse.notally.image.Event
 import com.omgodse.notally.image.ImageError
 import com.omgodse.notally.miscellaneous.IO
@@ -89,7 +89,11 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
     val reminder = MutableLiveData<Reminder>(null)
     private val manager = app.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-    val actionMode = SearchActionMode()
+    val searchBus = MutableLiveData<Event<Int>>()
+    val searchEnabled = BetterLiveData(false)
+    var query = String()
+    private var lastQuery = String()
+    val marker = MarkerSpan(0) // Temporary color, NotallyActivity will assign actual color
 
     fun addAudio() {
         viewModelScope.launch {
@@ -233,6 +237,57 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
     }
 
 
+    fun closeSearch() {
+        searchEnabled.value = false
+        lastQuery = String()
+        body.removeSpan(marker)
+    }
+
+    fun findNext() {
+        if (query.isNotEmpty()) {
+            if (query != lastQuery) {
+                body.removeSpan(marker)
+            }
+            val lastIndex = body.getSpanEnd(marker)
+            var index = body.indexOf(query, lastIndex + 1, ignoreCase = true)
+            if (index == -1) {
+                index = body.indexOf(query, ignoreCase = true)
+            }
+            if (index != -1) {
+                val start = index
+                val end = index + query.length
+                body.setSpan(marker, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                searchBus.value = Event(end)
+            } else {
+                Toast.makeText(app, "No results found", Toast.LENGTH_SHORT).show()
+            }
+            lastQuery = query
+        }
+    }
+
+    fun findPrevious() {
+        if (query.isNotEmpty()) {
+            if (query != lastQuery) {
+                body.removeSpan(marker)
+            }
+            val startIndex = body.getSpanStart(marker)
+            var index = body.lastIndexOf(query, startIndex - 1, ignoreCase = true)
+            if (index == -1) {
+                index = body.lastIndexOf(query, ignoreCase = true)
+            }
+            if (index != -1) {
+                val start = index
+                val end = index + query.length
+                body.setSpan(marker, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                searchBus.value = Event(end)
+            } else {
+                Toast.makeText(app, "No results found", Toast.LENGTH_SHORT).show()
+            }
+            lastQuery = query
+        }
+    }
+
+
     fun togglePin() {
         pinned.value = !pinned.value
     }
@@ -335,23 +390,25 @@ class NotallyModel(private val app: Application) : AndroidViewModel(app) {
     private fun getFilteredSpans(spanned: Spanned): ArrayList<SpanRepresentation> {
         val representations = LinkedHashSet<SpanRepresentation>()
         spanned.getSpans<CharacterStyle>().forEach { span ->
-            val end = spanned.getSpanEnd(span)
-            val start = spanned.getSpanStart(span)
-            val representation = SpanRepresentation(false, false, false, false, false, start, end)
+            if (span !is MarkerSpan) {
+                val end = spanned.getSpanEnd(span)
+                val start = spanned.getSpanStart(span)
+                val representation = SpanRepresentation(false, false, false, false, false, start, end)
 
-            when (span) {
-                is StyleSpan -> {
-                    representation.bold = span.style == Typeface.BOLD
-                    representation.italic = span.style == Typeface.ITALIC
+                when (span) {
+                    is StyleSpan -> {
+                        representation.bold = span.style == Typeface.BOLD
+                        representation.italic = span.style == Typeface.ITALIC
+                    }
+
+                    is URLSpan -> representation.link = true
+                    is TypefaceSpan -> representation.monospace = span.family == "monospace"
+                    is StrikethroughSpan -> representation.strikethrough = true
                 }
 
-                is URLSpan -> representation.link = true
-                is TypefaceSpan -> representation.monospace = span.family == "monospace"
-                is StrikethroughSpan -> representation.strikethrough = true
-            }
-
-            if (representation.isNotUseless()) {
-                representations.add(representation)
+                if (representation.isNotUseless()) {
+                    representations.add(representation)
+                }
             }
         }
         return getFilteredRepresentations(ArrayList(representations))

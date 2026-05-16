@@ -15,14 +15,17 @@ import android.os.Bundle
 import android.provider.Settings
 import android.text.Editable
 import android.util.TypedValue
+import android.view.KeyEvent
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup.LayoutParams
+import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
 import androidx.core.widget.doAfterTextChanged
@@ -65,8 +68,8 @@ abstract class NotallyActivity(private val type: Type) : AppCompatActivity() {
     internal val model: NotallyModel by viewModels()
 
     override fun onBackPressed() {
-        if (model.actionMode.enabled.value) {
-            model.actionMode.close()
+        if (model.searchEnabled.value) {
+            model.closeSearch()
         } else super.onBackPressed()
     }
 
@@ -92,6 +95,7 @@ abstract class NotallyActivity(private val type: Type) : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         model.type = type
+        model.marker.color = ContextCompat.getColor(this, R.color.highlight)
         initialiseBinding()
         setContentView(binding.root)
 
@@ -195,6 +199,18 @@ abstract class NotallyActivity(private val type: Type) : AppCompatActivity() {
         binding.DateCreated.text = formatter.format(model.timestamp)
 
         binding.EnterTitle.setText(model.title)
+
+        binding.EnterBody.setEditableFactory(object : Editable.Factory() {
+
+            override fun newEditable(source: CharSequence?): Editable {
+                return model.body
+            }
+        })
+        val end = model.body.getSpanEnd(model.marker)
+        if (end != -1) {
+            binding.EnterBody.requestFocus()
+            binding.EnterBody.setSelection(end)
+        }
     }
 
 
@@ -350,6 +366,7 @@ abstract class NotallyActivity(private val type: Type) : AppCompatActivity() {
             binding.root.setBackgroundColor(colorInt)
             binding.RecyclerView.setBackgroundColor(colorInt)
             binding.Toolbar.backgroundTintList = ColorStateList.valueOf(colorInt)
+            binding.Search.backgroundTintList = ColorStateList.valueOf(colorInt)
         })
     }
 
@@ -554,8 +571,8 @@ abstract class NotallyActivity(private val type: Type) : AppCompatActivity() {
         binding.Search.setNavigationOnClickListener { onBackPressed() }
 
         val menu = binding.Search.menu
-        menu.add(R.string.previous, R.drawable.previous) {}
-        menu.add(R.string.next, R.drawable.next) {}
+        menu.add(R.string.previous, R.drawable.previous) { model.findPrevious() }
+        menu.add(R.string.next, R.drawable.next) { model.findNext() }
 
         val manager = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
 
@@ -582,7 +599,7 @@ abstract class NotallyActivity(private val type: Type) : AppCompatActivity() {
             override fun onTransitionResume(transition: Transition) {}
         })
 
-        model.actionMode.enabled.observe(this, Observer { enabled ->
+        model.searchEnabled.observe(this, Observer { enabled ->
             TransitionManager.beginDelayedTransition(binding.ToolbarContainer, transition)
             if (enabled) {
                 binding.Search.visibility = View.VISIBLE
@@ -590,6 +607,31 @@ abstract class NotallyActivity(private val type: Type) : AppCompatActivity() {
                 binding.Search.visibility = View.GONE
             }
         })
+
+        model.searchBus.observe(this) { event ->
+            event.handle { end ->
+                binding.EnterBody.requestFocus()
+                binding.EnterBody.setSelection(end)
+            }
+        }
+
+        binding.EnterSearchKeyword.setText(model.query)
+        binding.EnterSearchKeyword.doAfterTextChanged { text ->
+            model.query = requireNotNull(text).trim().toString()
+        }
+
+        binding.EnterSearchKeyword.setOnEditorActionListener { _, actionId, event ->
+            val searchPressed = (actionId == EditorInfo.IME_ACTION_SEARCH)
+            val enterPressed = if (event != null) {
+                event.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN
+            } else false
+
+            if (searchPressed || enterPressed) {
+                model.findNext()
+            }
+
+            return@setOnEditorActionListener false
+        }
     }
 
     private fun setupToolbar() {
@@ -604,7 +646,9 @@ abstract class NotallyActivity(private val type: Type) : AppCompatActivity() {
 
         menu.add(R.string.share, R.drawable.share) { share() }
         menu.add(R.string.labels, R.drawable.label) { label() }
-        menu.add(R.string.search, R.drawable.search) { model.actionMode.enabled.value = true }
+        if (model.type == Type.NOTE) {
+            menu.add(R.string.search, R.drawable.search) { model.searchEnabled.value = true }
+        }
         menu.add(R.string.add_images, R.drawable.add_images) { selectImages() }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
