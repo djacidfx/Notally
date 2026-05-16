@@ -26,6 +26,7 @@ Notally is a minimalistic note taking app with a beautiful material design and p
 * Auto save and backup
 * APK size of 1.4 MB (1.8 MB uncompressed)
 * Add notes and lists to your home screen with widgets
+* Search within notes to find what you need quickly
 
 <b>Privacy</b>
 
